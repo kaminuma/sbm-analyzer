@@ -21,7 +21,7 @@ def create_app():
     try:
         app.config['NLI_PIPELINE'] = pipeline(
             "zero-shot-classification",
-            model="facebook/bart-large-mnli",
+            model="joeddav/xlm-roberta-large-xnli",
             device=0 if torch.cuda.is_available() else -1  # GPUが利用可能な場合はGPUを使用
         )
         logging.debug("AIモデルの初期化に成功しました。")
@@ -30,6 +30,9 @@ def create_app():
         raise e  # アプリケーション起動を中断
 
     # カテゴリの定義
-    app.config['CATEGORIES'] = ["運動", "仕事", "趣味", "休憩", "その他"]
+    app.config['CATEGORIES'] = [
+    "運動", "仕事", "学習", "趣味", 
+    "食事", "睡眠", "買い物", "娯楽"
+    ]
 
     return app
