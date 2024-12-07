@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify
 from app.analysis import fetch_data_by_period, calculate_total_time_per_category
 import logging
 
-bp = Blueprint("api", __name__)
+bp = Blueprint("api", __name__, url_prefix="/api/v1")
 
 def validate_date(date_text):
     from datetime import datetime
