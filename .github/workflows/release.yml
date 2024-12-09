@@ -1,0 +1,68 @@
+name: Deploy SBM Analyzer
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-analyzer:
+    runs-on: ubuntu-latest
+    environment: prod
+
+    steps:
+      # 1. リポジトリをチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. 成果物をEC2にデプロイ
+      - name: Deploy code to EC2
+        uses: burnett01/rsync-deployments@5.1
+        with:
+          switches: '-avz --delete --rsync-path="sudo rsync"'
+          path: ./ # ローカルのコードパス
+          remote_path: /srv/sbm/analyzer/ # EC2のデプロイ先ディレクトリ
+          remote_host: ${{ secrets.HOST }}
+          remote_user: ${{ secrets.USER }}
+          remote_key: ${{ secrets.SECRET_KEY }}
+
+      # 3. Conda 環境で依存関係のインストール
+      - name: Set up Python environment and install dependencies
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SECRET_KEY }}
+          script: |
+            cd /srv/sbm/analyzer
+            source ~/miniconda3/bin/activate
+            conda activate sbm-analyzer
+            pip install --upgrade pip
+            pip install -r requirements.txt
+
+      # 4. .env ファイルの生成
+      - name: Generate .env file
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SECRET_KEY }}
+          script: |
+            cat << EOF > /srv/sbm/analyzer/.env
+            ENVIRONMENT=prod
+            DB_USER=${{ secrets.DB_USER }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_HOST=${{ secrets.DB_HOST }}
+            DB_PORT=${{ secrets.DB_PORT }}
+            DB_NAME=${{ secrets.DB_NAME }}
+            EOF
+
+      # 5. サービスを再起動
+      - name: Restart sbm-analyzer service
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SECRET_KEY }}
+          script: |
+            sudo systemctl restart sbm-analyzer
