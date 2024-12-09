@@ -47,15 +47,22 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USER }}
           key: ${{ secrets.SECRET_KEY }}
-          script: |
-            cat << EOF > /srv/sbm/analyzer/.env
-            ENVIRONMENT=prod
-            DB_USER=${{ secrets.DB_USER }}
-            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            DB_HOST=${{ secrets.DB_HOST }}
-            DB_PORT=${{ secrets.DB_PORT }}
-            DB_NAME=${{ secrets.DB_NAME }}
-            EOF
+          script: |  
+                    
+        # 権限を一時的に変更
+          sudo chmod 777 /srv/sbm/analyzer/
+        # .env.example をコピーして .env を生成
+          cp /srv/sbm/analyzer/.env.example /srv/sbm/analyzer/.env
+        # 置換して環境変数を適用
+          sed -i "s|ENVIRONMENT=.*|ENVIRONMENT=prod|" /srv/sbm/analyzer/.env
+          sed -i "s|DB_USER=.*|DB_USER=${{ secrets.DB_USER }}|" /srv/sbm/analyzer/.env
+          sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=${{ secrets.DB_PASSWORD }}|" /srv/sbm/analyzer/.env
+          sed -i "s|DB_HOST=.*|DB_HOST=${{ secrets.DB_HOST }}|" /srv/sbm/analyzer/.env
+          sed -i "s|DB_PORT=.*|DB_PORT=${{ secrets.DB_PORT }}|" /srv/sbm/analyzer/.env
+          sed -i "s|DB_NAME=.*|DB_NAME=${{ secrets.DB_NAME }}|" /srv/sbm/analyzer/.env
+      # 権限を元に戻す
+          sudo chmod 755 /srv/sbm/analyzer/
+          sudo chown -R ubuntu:ubuntu /srv/sbm/analyzer/
 
       # 5. サービスを再起動
       - name: Restart sbm-analyzer service
