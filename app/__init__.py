@@ -21,7 +21,7 @@ def create_app():
     try:
         app.config['NLI_PIPELINE'] = pipeline(
             "zero-shot-classification",
-            model="joeddav/xlm-roberta-large-xnli",
+            model="xlm-roberta-base",
             device=0 if torch.cuda.is_available() else -1  # GPUが利用可能な場合はGPUを使用
         )
         logging.debug("AIモデルの初期化に成功しました。")
