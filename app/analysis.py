@@ -84,7 +84,7 @@ def fetch_data_by_period(start_date, end_date, user_id):
 
         # 各活動にカテゴリを追加
         data['category'] = [
-            result['labels'][0] ## if result['scores'][0] >= 0.5 else 'その他'
+            result['labels'][0] if result['scores'][0] >= 0.1 else 'その他'
             for result in classifications
         ]
 
