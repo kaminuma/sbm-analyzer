@@ -60,11 +60,12 @@ jobs:
             sudo chown -R ubuntu:ubuntu /srv/sbm/analyzer/
 
       # 5. サービスを再起動
-      - name: Restart sbm-analyzer service
-        uses: appleboy/ssh-action@v0.1.5
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USER }}
-          key: ${{ secrets.SECRET_KEY }}
-          script: |
-            sudo systemctl restart sbm-analyzer
+
+##      - name: Restart sbm-analyzer service
+##        uses: appleboy/ssh-action@v0.1.5
+##        with:
+##          host: ${{ secrets.HOST }}
+##          username: ${{ secrets.USER }}
+##          key: ${{ secrets.SECRET_KEY }}
+##          script: |
+##            sudo systemctl restart sbm-analyzer

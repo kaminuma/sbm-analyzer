@@ -21,7 +21,7 @@ def create_app():
     try:
         app.config['NLI_PIPELINE'] = pipeline(
             "zero-shot-classification",
-            model="xlm-roberta-base",
+            model="MoritzLaurer/multilingual-MiniLMv2-L12-mnli-xnli",
             device=0 if torch.cuda.is_available() else -1  # GPUが利用可能な場合はGPUを使用
         )
         logging.debug("AIモデルの初期化に成功しました。")
