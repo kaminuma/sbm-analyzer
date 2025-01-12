@@ -15,6 +15,7 @@ sbm-analyzer は、生活記録データを AI 技術を活用して解析し、
 - 活動内容 (`name` または `contents`) をもとに自然言語処理 (NLP) を利用して自動的にカテゴリ分け。
 - 技術: Hugging Face の zero-shot-classification パイプラインを活用。
 - モデル: MoritzLaurer/multilingual-MiniLMv2-L12-mnli-xnli
+
   生活記録をもとにした自動カテゴリ分類の種類
   - 運動
   - 仕事
