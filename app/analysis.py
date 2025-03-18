@@ -3,16 +3,17 @@ from sqlalchemy import create_engine
 from app.config import Config
 import logging
 from flask import current_app
+from sqlalchemy import text
 
 def fetch_data_by_period(start_date, end_date, user_id):
-    query = """
+    query = text("""
     SELECT name, contents, date, start_time, end_time
     FROM activities
-    WHERE user_id = %s
-      AND date >= %s
-      AND date <= %s
+    WHERE user_id = :user_id
+      AND date >= :start_date
+      AND date <= :end_date
       AND is_deleted = false
-    """
+    """)
 
     try:
         logging.debug("Before executing query")
@@ -21,16 +22,18 @@ def fetch_data_by_period(start_date, end_date, user_id):
             connect_args={"connect_timeout": 60},
             pool_pre_ping=True
         )
+
         with engine.connect() as connection:
             data = pd.read_sql_query(
                 query,
                 connection,
-                params=(user_id, start_date, end_date)
+                params={"user_id": user_id, "start_date": start_date, "end_date": end_date}
             )
+
         logging.debug("After executing query")
         logging.debug(f"Data fetched: {data.head()}")
     except Exception as e:
-        logging.error(f"Error in pd.read_sql: {e}")
+        logging.error(f"Error in pd.read_sql: {e}", exc_info=True)
         return None
 
     try:
@@ -42,7 +45,7 @@ def fetch_data_by_period(start_date, end_date, user_id):
         data["end_datetime"] = data["date"] + data["end_time"]
         logging.debug("Datetime conversion successful")
     except Exception as e:
-        logging.error(f"Error in datetime conversion: {e}")
+        logging.error(f"Error in datetime conversion: {e}", exc_info=True)
         return None
 
     try:
@@ -53,7 +56,7 @@ def fetch_data_by_period(start_date, end_date, user_id):
         data["end_datetime"] = data["end_datetime"].dt.strftime('%Y-%m-%dT%H:%M:%S')
         logging.debug("Conversion successful")
     except Exception as e:
-        logging.error(f"Error in converting columns for JSON serialization: {e}")
+        logging.error(f"Error in converting columns for JSON serialization: {e}", exc_info=True)
         return None
 
     # カテゴリ分類を実施
@@ -90,12 +93,9 @@ def fetch_data_by_period(start_date, end_date, user_id):
 
         logging.debug("Category classification successful")
     except Exception as e:
-        logging.error(f"Error in category classification: {e}")
+        logging.error(f"Error in category classification: {e}", exc_info=True)
         data['category'] = 'エラー'
         return data
-
-    # 最終返却前に再度、データフレームがJSONシリアライズ可能な形になっているかを確認
-    # （この時点では timedelta はないが、念のため datetime などがあればここで文字列化/削除）
 
     return data
 
@@ -137,5 +137,5 @@ def calculate_total_time_per_category(data):
         return total_seconds_per_category.to_dict(orient="records")
 
     except Exception as e:
-        logging.error(f"Error in calculating total time per category: {e}")
+        logging.error(f"Error in calculating total time per category: {e}", exc_info=True)
         return []
