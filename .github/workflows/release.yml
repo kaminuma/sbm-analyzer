@@ -66,31 +66,18 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USER }}
           key: ${{ secrets.SECRET_KEY }}
-          command_timeout: 30m
           script: |
             cd /srv/sbm/analyzer
-            # 既存のプロセスを停止
-            pkill -f "python run.py" || true
-            sleep 2
-            # 環境をアクティベート
             source ~/miniconda3/bin/activate
             conda activate sbm-analyzer
             # 既存のログファイルをクリア
             > app.log
-            # バックグラウンドでアプリを起動（タイムアウトを回避）
+            # バックグラウンドでアプリを起動
             nohup python run.py > app.log 2>&1 &
             # プロセスIDを保存
             echo $! > app.pid
             echo "🚀 アプリケーションを起動しました (PID: $(cat app.pid))"
-            # プロセスが起動するまで短時間待機
-            sleep 10
-            # プロセスの状態を確認
-            if pgrep -f "python run.py" > /dev/null; then
-              echo "✅ プロセスが正常に起動しています"
-            else
-              echo "⚠️ プロセスの起動を確認中..."
-              tail -10 app.log
-            fi
+            sleep 3
 
       # 6. ヘルスチェック
       - name: Health check
@@ -99,10 +86,9 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USER }}
           key: ${{ secrets.SECRET_KEY }}
-          command_timeout: 30m
           script: |
             echo "🏥 ヘルスチェック中..."
-            sleep 30
+            sleep 10
             cd /srv/sbm/analyzer
             # プロセスが動いているか確認
             if pgrep -f "python run.py" > /dev/null; then
@@ -122,8 +108,6 @@ jobs:
                   else
                     echo "ログファイルが見つかりません"
                   fi
-                  echo "🔄 モデルダウンロード中により時間がかかっていますが、デプロイはできています。"
-                  echo "⏰ 数分後に再度アクセスをお試しください。"
                 fi
               else
                 echo "❌ ポート5000でリッスンしていません"
@@ -133,8 +117,6 @@ jobs:
                 else
                   echo "ログファイルが見つかりません"
                 fi
-                echo "🔄 モデルダウンロード中により時間がかかっていますが、デプロイはできています。"
-                echo "⏰ 数分後に再度アクセスをお試しください。"
                 exit 1
               fi
             else
@@ -145,7 +127,5 @@ jobs:
               else
                 echo "ログファイルが見つかりません"
               fi
-              echo "🔄 モデルダウンロード中により時間がかかっていますが、デプロイはできています。"
-              echo "⏰ 数分後に再度アクセスをお試しください。"
               exit 1
             fi
