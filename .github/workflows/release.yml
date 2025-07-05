@@ -89,11 +89,12 @@ jobs:
           script: |
             echo "🏥 ヘルスチェック中..."
             sleep 10
+            cd /srv/sbm/analyzer
             # プロセスが動いているか確認
             if pgrep -f "python run.py" > /dev/null; then
               echo "✅ プロセスが正常に起動しています"
-              # ポート5000でリッスンしているか確認
-              if netstat -tlnp | grep :5000 > /dev/null; then
+              # ポート5000でリッスンしているか確認（ssコマンドを使用）
+              if ss -tlnp | grep :5000 > /dev/null; then
                 echo "✅ ポート5000で正常にリッスンしています"
                 # アプリケーションのレスポンスを確認
                 if curl -f http://localhost:5000/api/v1/analysis/category?start_date=2024-01-01&end_date=2024-01-01&user_id=test > /dev/null 2>&1; then
@@ -102,17 +103,29 @@ jobs:
                 else
                   echo "⚠️ アプリケーションの応答に問題があります"
                   echo "📋 ログを確認:"
-                  tail -20 app.log
+                  if [ -f "app.log" ]; then
+                    tail -20 app.log
+                  else
+                    echo "ログファイルが見つかりません"
+                  fi
                 fi
               else
                 echo "❌ ポート5000でリッスンしていません"
                 echo "📋 ログを確認:"
-                tail -20 app.log
+                if [ -f "app.log" ]; then
+                  tail -20 app.log
+                else
+                  echo "ログファイルが見つかりません"
+                fi
                 exit 1
               fi
             else
               echo "❌ プロセスが起動していません"
               echo "📋 ログを確認:"
-              tail -20 app.log
+              if [ -f "app.log" ]; then
+                tail -20 app.log
+              else
+                echo "ログファイルが見つかりません"
+              fi
               exit 1
             fi
