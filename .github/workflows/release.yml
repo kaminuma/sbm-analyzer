@@ -93,11 +93,11 @@ jobs:
             # プロセスが動いているか確認
             if pgrep -f "python run.py" > /dev/null; then
               echo "✅ プロセスが正常に起動しています"
-              # ポート5000でリッスンしているか確認（ssコマンドを使用）
-              if ss -tlnp | grep :5000 > /dev/null; then
-                echo "✅ ポート5000で正常にリッスンしています"
+              # ポート5001でリッスンしているか確認（ssコマンドを使用）
+              if ss -tlnp | grep :5001 > /dev/null; then
+                echo "✅ ポート5001で正常にリッスンしています"
                 # アプリケーションのレスポンスを確認
-                if curl -f http://localhost:5000/api/v1/analysis/category?start_date=2024-01-01&end_date=2024-01-01&user_id=test > /dev/null 2>&1; then
+                if curl -f http://localhost:5001/api/v1/analysis/category?start_date=2024-01-01&end_date=2024-01-01&user_id=test > /dev/null 2>&1; then
                   echo "✅ アプリケーションが正常に応答しています"
                   echo "🎉 デプロイが成功しました！"
                 else
@@ -110,7 +110,7 @@ jobs:
                   fi
                 fi
               else
-                echo "❌ ポート5000でリッスンしていません"
+                echo "❌ ポート5001でリッスンしていません"
                 echo "📋 ログを確認:"
                 if [ -f "app.log" ]; then
                   tail -20 app.log
