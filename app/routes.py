@@ -6,6 +6,11 @@ import logging
 
 bp = Blueprint("api", __name__, url_prefix="/api/v1")
 
+# ヘルスチェック用のエンドポイント
+@bp.route("/health", methods=["GET"])
+def health_check():
+    return jsonify({"status": "healthy", "service": "sbm-analyzer"}), 200
+
 def validate_date(date_text):
     from datetime import datetime
     try:

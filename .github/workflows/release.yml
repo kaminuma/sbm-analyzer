@@ -13,7 +13,7 @@ jobs:
     steps:
       # 1. リポジトリをチェックアウト
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # 2. 成果物をEC2にデプロイ
       - name: Deploy code to EC2
@@ -26,7 +26,33 @@ jobs:
           remote_user: ${{ secrets.USER }}
           remote_key: ${{ secrets.SECRET_KEY }}
 
-      # 3. Conda 環境で依存関係のインストール
+      # 3. バックアップを作成
+      - name: Create backup
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SECRET_KEY }}
+          script: |
+            cd /srv/sbm/analyzer
+            if [ -d "current" ]; then
+              echo "📦 現在のバージョンをバックアップ中..."
+              cp -r current backup_$(date +%Y%m%d_%H%M%S)
+            fi
+
+      # 4. 新しいコードをデプロイ
+      - name: Deploy new code
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SECRET_KEY }}
+          script: |
+            cd /srv/sbm/analyzer
+            echo "📥 新しいコードをデプロイ中..."
+            cp -r . current/
+
+      # 5. Conda 環境で依存関係のインストール
       - name: Set up Python environment and install dependencies
         uses: appleboy/ssh-action@v0.1.5
         with:
@@ -35,12 +61,20 @@ jobs:
           key: ${{ secrets.SECRET_KEY }}
           script: |
             cd /srv/sbm/analyzer
+            # conda環境の存在確認
+            if ! conda env list | grep -q "sbm-analyzer"; then
+              echo "❌ sbm-analyzer環境が見つかりません。手動で環境を作成してください。"
+              exit 1
+            fi
             source ~/miniconda3/bin/activate
             conda activate sbm-analyzer
+            # Pythonパスの確認
+            which python
+            python --version
             pip install --upgrade pip
             pip install -r requirements.txt
 
-      # 4. .env ファイルの生成
+      # 6. .env ファイルの生成
       - name: Generate .env file
         uses: appleboy/ssh-action@v0.1.5
         with:
@@ -48,24 +82,105 @@ jobs:
           username: ${{ secrets.USER }}
           key: ${{ secrets.SECRET_KEY }}
           script: |
+            cd /srv/sbm/analyzer
             sudo chmod 777 /srv/sbm/analyzer/
-            cp /srv/sbm/analyzer/.env.example /srv/sbm/analyzer/.env
-            sed -i "s|ENVIRONMENT=.*|ENVIRONMENT=prod|" /srv/sbm/analyzer/.env
-            sed -i "s|DB_USER=.*|DB_USER=${{ secrets.DB_USER }}|" /srv/sbm/analyzer/.env
-            sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=${{ secrets.DB_PASSWORD }}|" /srv/sbm/analyzer/.env
-            sed -i "s|DB_HOST=.*|DB_HOST=${{ secrets.DB_HOST }}|" /srv/sbm/analyzer/.env
-            sed -i "s|DB_PORT=.*|DB_PORT=${{ secrets.DB_PORT }}|" /srv/sbm/analyzer/.env
-            sed -i "s|DB_NAME=.*|DB_NAME=${{ secrets.DB_NAME }}|" /srv/sbm/analyzer/.env
+            # .envファイルが存在しない場合は作成
+            if [ ! -f ".env" ]; then
+              cat > .env << EOF
+              ENVIRONMENT=prod
+              DB_USER=${{ secrets.DB_USER }}
+              DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+              DB_HOST=${{ secrets.DB_HOST }}
+              DB_PORT=${{ secrets.DB_PORT }}
+              DB_NAME=${{ secrets.DB_NAME }}
+              FLASK_ENV=production
+              FLASK_DEBUG=False
+              SECRET_KEY=${{ secrets.SECRET_KEY }}
+              LOG_LEVEL=INFO
+              EOF
+            else
+              # 既存の.envファイルを更新
+              sed -i "s|ENVIRONMENT=.*|ENVIRONMENT=prod|" .env
+              sed -i "s|DB_USER=.*|DB_USER=${{ secrets.DB_USER }}|" .env
+              sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=${{ secrets.DB_PASSWORD }}|" .env
+              sed -i "s|DB_HOST=.*|DB_HOST=${{ secrets.DB_HOST }}|" .env
+              sed -i "s|DB_PORT=.*|DB_PORT=${{ secrets.DB_PORT }}|" .env
+              sed -i "s|DB_NAME=.*|DB_NAME=${{ secrets.DB_NAME }}|" .env
+              sed -i "s|FLASK_ENV=.*|FLASK_ENV=production|" .env
+              sed -i "s|FLASK_DEBUG=.*|FLASK_DEBUG=False|" .env
+              sed -i "s|SECRET_KEY=.*|SECRET_KEY=${{ secrets.SECRET_KEY }}|" .env
+              sed -i "s|LOG_LEVEL=.*|LOG_LEVEL=INFO|" .env
+            fi
             sudo chmod 755 /srv/sbm/analyzer/
             sudo chown -R ubuntu:ubuntu /srv/sbm/analyzer/
 
-      # 5. サービスを再起動
+      # 7. システムサービスファイルを作成
+      - name: Create systemd service file
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SECRET_KEY }}
+          script: |
+            sudo tee /etc/systemd/system/sbm-analyzer.service > /dev/null << 'EOF'
+            [Unit]
+            Description=SBM Analyzer Flask Application
+            After=network.target
 
-##      - name: Restart sbm-analyzer service
-##        uses: appleboy/ssh-action@v0.1.5
-##        with:
-##          host: ${{ secrets.HOST }}
-##          username: ${{ secrets.USER }}
-##          key: ${{ secrets.SECRET_KEY }}
-##          script: |
-##            sudo systemctl restart sbm-analyzer
+            [Service]
+            Type=simple
+            User=ubuntu
+            Group=ubuntu
+            WorkingDirectory=/srv/sbm/analyzer
+            Environment=PATH=/home/ubuntu/miniconda3/envs/sbm-analyzer/bin:/home/ubuntu/miniconda3/bin
+            Environment=CONDA_DEFAULT_ENV=sbm-analyzer
+            ExecStart=/home/ubuntu/miniconda3/envs/sbm-analyzer/bin/python run.py
+            Restart=always
+            RestartSec=10
+
+            [Install]
+            WantedBy=multi-user.target
+            EOF
+
+      # 8. システムサービスを有効化して再起動
+      - name: Enable and restart service
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SECRET_KEY }}
+          script: |
+            sudo systemctl daemon-reload
+            sudo systemctl enable sbm-analyzer
+            sudo systemctl restart sbm-analyzer
+
+      # 9. ヘルスチェック
+      - name: Health check
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SECRET_KEY }}
+          script: |
+            echo "🏥 ヘルスチェック中..."
+            sleep 15
+            if curl -f http://localhost:5001/api/v1/health > /dev/null 2>&1; then
+              echo "✅ デプロイが成功しました！"
+              sudo systemctl status sbm-analyzer
+            else
+              echo "❌ デプロイに失敗しました。ログを確認してください。"
+              sudo journalctl -u sbm-analyzer -n 50
+              exit 1
+            fi
+
+      # 10. 古いバックアップをクリーンアップ（30日以上古いもの）
+      - name: Cleanup old backups
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SECRET_KEY }}
+          script: |
+            cd /srv/sbm/analyzer
+            find . -name "backup_*" -type d -mtime +30 -exec rm -rf {} \;
+            echo "🧹 古いバックアップをクリーンアップしました"
