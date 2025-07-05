@@ -59,13 +59,68 @@ jobs:
             sudo chmod 755 /srv/sbm/analyzer/
             sudo chown -R ubuntu:ubuntu /srv/sbm/analyzer/
 
-      # 5. サービスを再起動
+      # 5. 既存のプロセスを停止
+      - name: Stop existing process
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SECRET_KEY }}
+          script: |
+            cd /srv/sbm/analyzer
+            # 既存のPythonプロセスを停止
+            pkill -f "python run.py" || true
+            sleep 3
 
-##      - name: Restart sbm-analyzer service
-##        uses: appleboy/ssh-action@v0.1.5
-##        with:
-##          host: ${{ secrets.HOST }}
-##          username: ${{ secrets.USER }}
-##          key: ${{ secrets.SECRET_KEY }}
-##          script: |
-##            sudo systemctl restart sbm-analyzer
+      # 6. アプリを起動
+      - name: Start application
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SECRET_KEY }}
+          script: |
+            cd /srv/sbm/analyzer
+            source ~/miniconda3/bin/activate
+            conda activate sbm-analyzer
+            # バックグラウンドでアプリを起動
+            nohup python run.py > app.log 2>&1 &
+            echo "🚀 アプリケーションを起動しました"
+
+      # 7. ヘルスチェック
+      - name: Health check
+        uses: appleboy/ssh-action@v0.1.5
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SECRET_KEY }}
+          script: |
+            echo "🏥 ヘルスチェック中..."
+            sleep 10
+            # プロセスが動いているか確認
+            if pgrep -f "python run.py" > /dev/null; then
+              echo "✅ プロセスが正常に起動しています"
+              # ポート5000でリッスンしているか確認
+              if netstat -tlnp | grep :5000 > /dev/null; then
+                echo "✅ ポート5000で正常にリッスンしています"
+                # アプリケーションのレスポンスを確認
+                if curl -f http://localhost:5000/api/v1/analysis/category?start_date=2024-01-01&end_date=2024-01-01&user_id=test > /dev/null 2>&1; then
+                  echo "✅ アプリケーションが正常に応答しています"
+                  echo "🎉 デプロイが成功しました！"
+                else
+                  echo "⚠️ アプリケーションの応答に問題があります"
+                  echo "📋 ログを確認:"
+                  tail -20 app.log
+                fi
+              else
+                echo "❌ ポート5000でリッスンしていません"
+                echo "📋 ログを確認:"
+                tail -20 app.log
+                exit 1
+              fi
+            else
+              echo "❌ プロセスが起動していません"
+              echo "📋 ログを確認:"
+              tail -20 app.log
+              exit 1
+            fi
