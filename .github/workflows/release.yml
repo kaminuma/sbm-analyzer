@@ -68,9 +68,20 @@ jobs:
           key: ${{ secrets.SECRET_KEY }}
           script: |
             cd /srv/sbm/analyzer
-            # 既存のPythonプロセスを停止
-            pkill -f "python run.py" || true
-            sleep 3
+            # 既存のPythonプロセスを安全に停止
+            if pgrep -f "python run.py" > /dev/null; then
+              echo "🛑 既存のプロセスを停止中..."
+              pkill -TERM -f "python run.py" || true
+              sleep 5
+              # 強制終了が必要な場合
+              if pgrep -f "python run.py" > /dev/null; then
+                echo "🛑 強制終了を実行..."
+                pkill -KILL -f "python run.py" || true
+                sleep 2
+              fi
+            else
+              echo "ℹ️ 停止するプロセスが見つかりません"
+            fi
 
       # 6. アプリを起動
       - name: Start application
@@ -83,9 +94,14 @@ jobs:
             cd /srv/sbm/analyzer
             source ~/miniconda3/bin/activate
             conda activate sbm-analyzer
+            # 既存のログファイルをクリア
+            > app.log
             # バックグラウンドでアプリを起動
             nohup python run.py > app.log 2>&1 &
-            echo "🚀 アプリケーションを起動しました"
+            # プロセスIDを保存
+            echo $! > app.pid
+            echo "🚀 アプリケーションを起動しました (PID: $(cat app.pid))"
+            sleep 3
 
       # 7. ヘルスチェック
       - name: Health check
