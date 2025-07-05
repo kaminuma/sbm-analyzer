@@ -59,31 +59,7 @@ jobs:
             sudo chmod 755 /srv/sbm/analyzer/
             sudo chown -R ubuntu:ubuntu /srv/sbm/analyzer/
 
-      # 5. 既存のプロセスを停止
-      - name: Stop existing process
-        uses: appleboy/ssh-action@v0.1.5
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USER }}
-          key: ${{ secrets.SECRET_KEY }}
-          script: |
-            cd /srv/sbm/analyzer
-            # 既存のPythonプロセスを安全に停止
-            if pgrep -f "python run.py" > /dev/null; then
-              echo "🛑 既存のプロセスを停止中..."
-              pkill -TERM -f "python run.py" || true
-              sleep 5
-              # 強制終了が必要な場合
-              if pgrep -f "python run.py" > /dev/null; then
-                echo "🛑 強制終了を実行..."
-                pkill -KILL -f "python run.py" || true
-                sleep 2
-              fi
-            else
-              echo "ℹ️ 停止するプロセスが見つかりません"
-            fi
-
-      # 6. アプリを起動
+      # 5. アプリを起動
       - name: Start application
         uses: appleboy/ssh-action@v0.1.5
         with:
@@ -103,7 +79,7 @@ jobs:
             echo "🚀 アプリケーションを起動しました (PID: $(cat app.pid))"
             sleep 3
 
-      # 7. ヘルスチェック
+      # 6. ヘルスチェック
       - name: Health check
         uses: appleboy/ssh-action@v0.1.5
         with:
