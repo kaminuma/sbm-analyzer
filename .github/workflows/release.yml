@@ -66,6 +66,7 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USER }}
           key: ${{ secrets.SECRET_KEY }}
+          command_timeout: 30m
           script: |
             cd /srv/sbm/analyzer
             # 既存のプロセスを停止
@@ -76,12 +77,20 @@ jobs:
             conda activate sbm-analyzer
             # 既存のログファイルをクリア
             > app.log
-            # バックグラウンドでアプリを起動
+            # バックグラウンドでアプリを起動（タイムアウトを回避）
             nohup python run.py > app.log 2>&1 &
             # プロセスIDを保存
             echo $! > app.pid
             echo "🚀 アプリケーションを起動しました (PID: $(cat app.pid))"
-            sleep 5
+            # プロセスが起動するまで短時間待機
+            sleep 10
+            # プロセスの状態を確認
+            if pgrep -f "python run.py" > /dev/null; then
+              echo "✅ プロセスが正常に起動しています"
+            else
+              echo "⚠️ プロセスの起動を確認中..."
+              tail -10 app.log
+            fi
 
       # 6. ヘルスチェック
       - name: Health check
@@ -90,9 +99,10 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USER }}
           key: ${{ secrets.SECRET_KEY }}
+          command_timeout: 30m
           script: |
             echo "🏥 ヘルスチェック中..."
-            sleep 10
+            sleep 30
             cd /srv/sbm/analyzer
             # プロセスが動いているか確認
             if pgrep -f "python run.py" > /dev/null; then
